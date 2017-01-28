@@ -1,0 +1,66 @@
+---
+title: "PredictAssignmentRCode"
+output: html_document
+---
+
+
+```{r}
+options(warn=-1)
+library(caret)
+library(randomForest)
+library(Hmisc)
+
+library(foreach)
+library(doParallel)
+set.seed(4356)
+```
+
+###Getting the data
+Read the data with read.csv from local drive
+The raw training data will be in a data-frame variable called training and raw testing data in  testing. 
+```{r}
+setwd("D:/Coursera Assignment")
+data <- read.csv("pml-training.csv")
+```
+
+First we need to reimport data ignoring "#DIV/0!" values
+```{r}
+data <- read.csv("pml-training.csv",na.strings=c("#DIV/0!") )
+```
+
+Cast to numeric values for the specified columns
+```{r}
+cData <- data
+for(i in c(8:ncol(cData)-1)) {cData[,i] = as.numeric(as.character(cData[,i]))}
+```
+
+We will select as feature only the column with a 100% completion rate, as seen in analysis phase, the completion rate in this dataset is very binary
+```{r}
+featuresnames <- colnames(cData[colSums(is.na(cData)) == 0])[-(1:7)]
+features <- cData[featuresnames]
+
+xdata <- createDataPartition(y=features$classe, p=3/4, list=FALSE )
+training <- features[xdata,]
+testing <- features[-xdata,]
+```
+
+We will use parallel concept for processing with the foreach and doParallel package
+```{r}
+registerDoParallel()
+model <- foreach(ntree=rep(150, 4), .combine=randomForest::combine) %do% randomForest(training[-ncol(training)],training$classe, ntree=ntree)
+```
+
+To evaluate the model now, we will use the confusionmatrix method
+```{r}
+predictionsTr <- predict(model, newdata=training)
+confusionMatrix(predictionsTr,training$classe)
+
+
+predictionsTe <- predict(model, newdata=testing)
+confusionMatrix(predictionsTe,testing$classe)
+```
+
+###Conclusion
+As seen by the result of the confusionmatrix, the model is good and efficient because it has an accuracy of 0.997 
+Lowest value is 0.992 for the sensitivity of the class C
+So its also a good sensitivity & specificity values on the testing dataset.
